@@ -2,7 +2,6 @@ package mdns
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -112,27 +111,15 @@ type client struct {
 func newClient() (*client, error) {
 	// TODO(reddaly): At least attempt to bind to the port required in the spec.
 	// Create a IPv4 listener
-	uconn4, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
-	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
-	}
-	uconn6, err := net.ListenUDP("udp6", &net.UDPAddr{IP: net.IPv6zero, Port: 0})
-	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
-	}
+	uconn4, _ := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	uconn6, _ := net.ListenUDP("udp6", &net.UDPAddr{IP: net.IPv6zero, Port: 0})
 
 	if uconn4 == nil && uconn6 == nil {
 		return nil, fmt.Errorf("failed to bind to any unicast udp port")
 	}
 
-	mconn4, err := net.ListenMulticastUDP("udp4", nil, ipv4Addr)
-	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
-	}
-	mconn6, err := net.ListenMulticastUDP("udp6", nil, ipv6Addr)
-	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
-	}
+	mconn4, _ := net.ListenMulticastUDP("udp4", nil, ipv4Addr)
+	mconn6, _ := net.ListenMulticastUDP("udp6", nil, ipv6Addr)
 
 	if mconn4 == nil && mconn6 == nil {
 		return nil, fmt.Errorf("failed to bind to any multicast udp port")
@@ -157,8 +144,6 @@ func (c *client) Close() error {
 		return nil
 	}
 	c.closed = true
-
-	log.Printf("[INFO] mdns: Closing client %v", *c)
 	close(c.closedCh)
 
 	if c.ipv4UnicastConn != nil {
@@ -295,9 +280,7 @@ func (c *client) query(params *QueryParam) error {
 				m := new(dns.Msg)
 				m.SetQuestion(inp.Name, dns.TypePTR)
 				m.RecursionDesired = false
-				if err := c.sendQuery(m); err != nil {
-					log.Printf("[ERR] mdns: Failed to query instance %s: %v", inp.Name, err)
-				}
+				_ = c.sendQuery(m)
 			}
 		case <-finish:
 			return nil
@@ -329,12 +312,10 @@ func (c *client) recv(l *net.UDPConn, msgCh chan *dns.Msg) {
 	for !c.closed {
 		n, err := l.Read(buf)
 		if err != nil {
-			log.Printf("[ERR] mdns: Failed to read packet: %v", err)
 			continue
 		}
 		msg := new(dns.Msg)
 		if err := msg.Unpack(buf[:n]); err != nil {
-			log.Printf("[ERR] mdns: Failed to unpack packet: %v", err)
 			continue
 		}
 		select {
